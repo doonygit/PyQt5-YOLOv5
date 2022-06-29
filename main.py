@@ -13,14 +13,19 @@ import os
 import time
 import cv2
 
+import traceback
+import cgitb
+
+cgitb.enable()
+
 from models.experimental import attempt_load
-from utils.datasets import LoadImages, LoadWebcam
+from utils.dataloaders import LoadImages,LoadWebcam
 from utils.CustomMessageBox import MessageBox
+from utils.plots import Annotator, colors, save_one_box,plot_one_box
 # LoadWebcam 的最后一个返回值改为 self.cap
 from utils.general import check_img_size, check_requirements, check_imshow, colorstr, non_max_suppression, \
-    apply_classifier, scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, save_one_box
-from utils.plots import colors, plot_one_box, plot_one_box_PIL
-from utils.torch_utils import select_device, load_classifier, time_sync
+    apply_classifier, scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
+from utils.torch_utils import select_device, time_sync
 from utils.capnums import Camera
 from dialog.rtsp_win import Window
 
@@ -78,7 +83,7 @@ class DetThread(QThread):
             half &= device.type != 'cpu'  # half precision only supported on CUDA
 
             # Load model
-            model = attempt_load(self.weights, map_location=device)  # load FP32 model
+            model = attempt_load(self.weights, device=device)  # load FP32 model
             num_params = 0
             for param in model.parameters():
                 num_params += param.numel()
@@ -118,7 +123,7 @@ class DetThread(QThread):
                 # 临时更换模型
                 if self.current_weight != self.weights:
                     # Load model
-                    model = attempt_load(self.weights, map_location=device)  # load FP32 model
+                    model = attempt_load(self.weights, device=device)  # load FP32 model
                     num_params = 0
                     for param in model.parameters():
                         num_params += param.numel()
@@ -133,7 +138,7 @@ class DetThread(QThread):
                     self.current_weight = self.weights
                 # 暂停开关
                 if self.is_continue:
-                    path, img, im0s, self.vid_cap = next(dataset)
+                    path, img, im0s, self.vid_cap,s = next(dataset)
                     # jump_count += 1
                     # if jump_count % 5 != 0:
                     #     continue
@@ -215,6 +220,7 @@ class DetThread(QThread):
                         break
 
         except Exception as e:
+            print('异常信息：%s' % traceback.format_exc())
             self.send_msg.emit('%s' % e)
 
 

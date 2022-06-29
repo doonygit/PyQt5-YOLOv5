@@ -1,3 +1,3 @@
 {
-  "ip": "rtsp://admin:admin888@192.168.1.67:555"
+  "ip": "rtmp://127.0.0.1:1935/live/stream1"
 }
