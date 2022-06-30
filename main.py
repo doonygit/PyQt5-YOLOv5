@@ -52,6 +52,7 @@ class DetThread(QThread):
         self.rate_check = True                  # 是否启用延时
         self.rate = 100                         # 延时HZ
         self.save_fold = './result'             # 保存文件夹
+        #self.sourceType = 'video'               # 源文件类型，image\video\webcam\camera
 
     @torch.no_grad()
     def run(self,
@@ -93,14 +94,20 @@ class DetThread(QThread):
             if half:
                 model.half()  # to FP16
 
+            sourceType = ''
             # Dataloader
             if self.source.isnumeric() or self.source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://')):
                 view_img = check_imshow()
                 cudnn.benchmark = True  # set True to speed up constant image size inference
                 dataset = LoadWebcam(self.source, img_size=imgsz, stride=stride)
                 # bs = len(dataset)  # batch_size
+                if self.source.isnumeric():
+                    sourceType = 'camera'
+                if self.source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://')):
+                    sourceType = 'webcam'
             else:
                 dataset = LoadImages(self.source, img_size=imgsz, stride=stride)
+                sourceType = 'image'#先默认为image,后面根据数据读取vid_cap再判断
 
             # Run inference
             if device.type != 'cpu':
@@ -114,7 +121,8 @@ class DetThread(QThread):
             while True:
                 # 手动停止
                 if self.jump_out:
-                    self.vid_cap.release()
+                    if sourceType=='video':
+                        self.vid_cap.release()
                     self.send_percent.emit(0)
                     self.send_msg.emit('停止')
                     if hasattr(self, 'out'):
@@ -139,6 +147,8 @@ class DetThread(QThread):
                 # 暂停开关
                 if self.is_continue:
                     path, img, im0s, self.vid_cap,s = next(dataset)
+                    if sourceType=='image' and self.vid_cap is not None :
+                        sourceType = 'video'
                     # jump_count += 1
                     # if jump_count % 5 != 0:
                     #     continue
@@ -148,10 +158,10 @@ class DetThread(QThread):
                         fps = int(30/(time.time()-start_time))
                         self.send_fps.emit('fps：'+str(fps))
                         start_time = time.time()
-                    if self.vid_cap:
+                    if sourceType=='video':# 如果输入是视频
                         percent = int(count/self.vid_cap.get(cv2.CAP_PROP_FRAME_COUNT)*self.percent_length)
                         self.send_percent.emit(percent)
-                    else:
+                    else:#如果输入的是图片、流媒体、摄像头
                         percent = self.percent_length
 
                     statistic_dic = {name: 0 for name in names}
@@ -191,13 +201,13 @@ class DetThread(QThread):
                     # 如果自动录制
                     if self.save_fold:
                         os.makedirs(self.save_fold, exist_ok=True)  # 路径不存在，自动保存
-                        # 如果输入是图片
-                        if self.vid_cap is None:
+                        # 如果输入是图片、流媒体、摄像头
+                        if sourceType=='image':
                             save_path = os.path.join(self.save_fold,
                                                      time.strftime('%Y_%m_%d_%H_%M_%S',
                                                                    time.localtime()) + '.jpg')
                             cv2.imwrite(save_path, im0)
-                        else:
+                        elif sourceType=='video':# 如果输入是视频
                             if count == 1:  # 第一帧时初始化录制
                                 # 以视频原始帧率进行录制
                                 ori_fps = int(self.vid_cap.get(cv2.CAP_PROP_FPS))
@@ -210,7 +220,7 @@ class DetThread(QThread):
                                 self.out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), ori_fps,
                                                            (width, height))
                             self.out.write(im0)
-                    if percent == self.percent_length:
+                    if percent == self.percent_length and sourceType=='image':
                         print(count)
                         self.send_percent.emit(0)
                         self.send_msg.emit('检测结束')
