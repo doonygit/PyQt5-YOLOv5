@@ -45,6 +45,23 @@ from utils.general import (LOGGER, check_file, check_img_size, check_imshow, che
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, time_sync
 
+'''
+chinese_names：就是对应的中文标签，例如：['人类','领带']，注意这里的顺序要和原来的英文标签一致；
+如果只希望修改一部分为中文，另一份仍然为英文，则只需要将要修改的部分改为中文即可，例如：['person','领带']
+weights：为要修改的权重文件
+'''
+# 将英文标签训练好的权重文件，转换为中文标签
+def en_to_ch(chinese_names, weights):
+    # 读取权重文件
+    weights_dict = torch.load(weights)
+    print('权重文件标签名：%s' % weights_dict['model'].names)
+    # 将原来的英文标签，替换为中文标签
+    weights_dict['model'].names = chinese_names
+    # 最后保存到原文件中
+    torch.save(weights_dict, weights)
+    print('标签名已替换成中文！新标签名：%s' % chinese_names)
+
+
 # 预测不更新梯度
 @torch.no_grad()
 def run(
@@ -340,6 +357,8 @@ def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
     # 执行run()函数
     run(**vars(opt))
+    #cnName = ['已戴口罩', '未戴口罩', '未正确戴口罩']
+    #en_to_ch(cnName,'C:/Users/admin/Downloads/戴口罩/mask_yolov5.pt')
 
 
 if __name__ == "__main__":

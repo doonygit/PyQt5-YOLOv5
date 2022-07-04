@@ -292,6 +292,29 @@ def plot_one_box(x, im, color=(128, 128, 128), label=None, line_thickness=3):
         cv2.rectangle(im, c1, c2, color, -1, cv2.LINE_AA)  # filled
         cv2.putText(im, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
 
+#中文画框
+def plot_one_box_PIL(x, im, color=(128, 128, 128), label=None, line_thickness=3):
+    # Plots one bounding box on image 'im' using OpenCV
+    assert im.data.contiguous, 'Image not contiguous. Apply np.ascontiguousarray(im) to plot_on_box() input image.'
+    tl = line_thickness or round(0.002 * (im.shape[0] + im.shape[1]) / 2) + 1  # line/font thickness
+    c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
+    cv2.rectangle(im, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+    if label:
+        tf = max(tl - 1, 1)  # font thickness
+        t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
+        #font = ImageFont.truetype("msyh.ttc", font_size,encoding='utf-8')
+        sm=Image.fromarray(im)
+        font = ImageFont.truetype("msyh.ttc", size=max(round(max(sm.size) / 45), 6))
+        txt_width, txt_height = font.getsize(label)
+        t_size = font.getsize(label)
+        c2 = c1[0] + t_size[0], c1[1] - t_size[1]
+        cv2.rectangle(im, c1, c2, color, -1, cv2.LINE_AA)  # filled
+        img_PIL = Image.fromarray(cv2.cvtColor(im, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(img_PIL)
+        draw.text((x[0], x[1] - txt_height + 1), label, fill=(255, 255, 255), font=font)
+
+        return cv2.cvtColor(np.array(img_PIL), cv2.COLOR_RGB2BGR)
+
 def plot_targets_txt():  # from utils.plots import *; plot_targets_txt()
     # Plot targets.txt histograms
     x = np.loadtxt('targets.txt', dtype=np.float32).T

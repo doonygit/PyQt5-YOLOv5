@@ -21,7 +21,7 @@ cgitb.enable()
 from models.experimental import attempt_load
 from utils.dataloaders import LoadImages,LoadWebcam
 from utils.CustomMessageBox import MessageBox
-from utils.plots import Annotator, colors, save_one_box,plot_one_box
+from utils.plots import Annotator, colors, save_one_box,plot_one_box,plot_one_box_PIL
 # LoadWebcam 的最后一个返回值改为 self.cap
 from utils.general import check_img_size, check_requirements, check_imshow, colorstr, non_max_suppression, \
     apply_classifier, scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
@@ -188,9 +188,8 @@ class DetThread(QThread):
                                 c = int(cls)  # integer class
                                 statistic_dic[names[c]] += 1
                                 label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                                # im0 = plot_one_box_PIL(xyxy, im0, label=label, color=colors(c, True), line_thickness=line_thickness)  # 中文标签画框，但是耗时会增加
-                                plot_one_box(xyxy, im0, label=label, color=colors(c, True),
-                                             line_thickness=line_thickness)
+                                im0 = plot_one_box_PIL(xyxy, im0, label=label, color=colors(c, True), line_thickness=line_thickness)  # 中文标签画框，但是耗时会增加
+                                #plot_one_box(xyxy, im0, label=label, color=colors(c, True), line_thickness=line_thickness)
 
                     # 控制视频发送频率
                     if self.rate_check:
