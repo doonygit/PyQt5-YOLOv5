@@ -94,7 +94,8 @@ class DetThread(QThread):
             if half:
                 model.half()  # to FP16
 
-            sourceType = ''
+            sourceType = '' #源文件类型 image\video\webcam\camera
+            frames = 0 #总检测数，如果是流，总检测数为-1；图片为1；视频文件为实际帧数
             # Dataloader
             if self.source.isnumeric() or self.source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://')):
                 view_img = check_imshow()
@@ -103,11 +104,18 @@ class DetThread(QThread):
                 # bs = len(dataset)  # batch_size
                 if self.source.isnumeric():
                     sourceType = 'camera'
+                    frames = -1
                 if self.source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://')):
                     sourceType = 'webcam'
+                    frames = -1
             else:
                 dataset = LoadImages(self.source, img_size=imgsz, stride=stride)
-                sourceType = 'image'#先默认为image,后面根据数据读取vid_cap再判断
+                if dataset.__getattribute__('video_flag')[0]:
+                    sourceType = 'video'
+                    frames = dataset.__getattribute__('frames')  # 总帧数
+                else:
+                    sourceType = 'image'  # image
+                    frames = 1
 
             # Run inference
             if device.type != 'cpu':
@@ -117,7 +125,6 @@ class DetThread(QThread):
             jump_count = 0
             start_time = time.time()
             dataset = iter(dataset)
-
             while True:
                 # 手动停止
                 if self.jump_out:
@@ -127,6 +134,7 @@ class DetThread(QThread):
                     self.send_msg.emit('停止')
                     if hasattr(self, 'out'):
                         self.out.release()
+                    print('手动停止，退出！')
                     break
                 # 临时更换模型
                 if self.current_weight != self.weights:
@@ -145,7 +153,7 @@ class DetThread(QThread):
                         model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
                     self.current_weight = self.weights
                 # 暂停开关
-                if self.is_continue:
+                if self.is_continue and (count<frames or frames<0):
                     path, img, im0s, self.vid_cap,s = next(dataset)
                     if sourceType=='image' and self.vid_cap is not None :
                         sourceType = 'video'
@@ -153,6 +161,8 @@ class DetThread(QThread):
                     # if jump_count % 5 != 0:
                     #     continue
                     count += 1
+                    cfs = f'{count}/{frames}' #帧数进度
+                    print('进度：%s' % cfs)
                     # 每三十帧刷新一次输出帧率
                     if count % 30 == 0 and count >= 30:
                         fps = int(30/(time.time()-start_time))
@@ -219,18 +229,18 @@ class DetThread(QThread):
                                 self.out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), ori_fps,
                                                            (width, height))
                             self.out.write(im0)
-                    if percent == self.percent_length and sourceType=='image':
-                        print(count)
+                    if (sourceType=='image') or (sourceType=='video' and count==frames):
+                        print('检测结束，退出！')
                         self.send_percent.emit(0)
                         self.send_msg.emit('检测结束')
                         if hasattr(self, 'out'):
                             self.out.release()
                         # 正常跳出循环
                         break
-
         except Exception as e:
             print('异常信息：%s' % traceback.format_exc())
             self.send_msg.emit('%s' % e)
+            self.out.release()
 
 
 
